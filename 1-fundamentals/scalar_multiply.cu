@@ -45,3 +45,28 @@ int main() {
 
     return 0;
 }
+
+/*
+
+
+
+CPU VERSION
+
+for(int i=0;i<N;i++)
+{
+    C[i] = alpha * A[i];
+}
+
+
+Thread0 -> C[0] = 3*A[0]
+
+Thread1 -> C[1] = 3*A[1]
+
+Thread2 -> C[2] = 3*A[2]
+
+...
+
+Thread1023 -> C[1023]
+
+
+*/

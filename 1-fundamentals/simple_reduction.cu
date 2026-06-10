@@ -70,3 +70,25 @@ int main() {
 
     return 0;
 }
+
+/*
+
+CPU
+
+float sum = 0;
+
+for (int i = 0; i < N; i++)
+{
+    sum += input[i];
+}
+
+Thread0 负责 input[0]
+Thread1 负责 input[1]
+Thread2 负责 input[2]
+...
+
+
+data race condition
+
+
+*/

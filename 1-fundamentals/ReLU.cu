@@ -44,3 +44,25 @@ int main() {
 
     return 0;
 }
+
+/*
+
+ReLU = Rectified Linear Unit
+
+CPU
+
+for(int i=0;i<N;i++)
+{
+    output[i] = std::max(0.0f, input[i]);
+}
+
+Thread0 -> input[0]
+
+Thread1 -> input[1]
+
+Thread2 -> input[2]
+
+...
+
+
+*/

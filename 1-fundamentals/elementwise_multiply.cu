@@ -49,3 +49,10 @@ int main() {
 
     return 0;
 }
+
+/*
+
+C[i] = A[i] * B[i]
+
+
+*/

@@ -2,71 +2,139 @@
 #include <cmath>
 #include <cuda_runtime.h>
 
-#define MAX_D 1024
+// softmax(x_i) = exp(x_i) / sum(exp(x_j))
 
-__global__ void softmaxKernel(const float* input, float* output, int rows, int cols) {
-    int row = blockIdx.x;
+__global__ void softmaxKernel(
+    const float* input,
+    float* output,
+    int N)
+{
+    extern __shared__ float sdata[];
 
-    if (row < rows) {
-        float maxVal = input[row * cols];
+    int tid = threadIdx.x;
 
-        for (int i = 1; i < cols; i++) {
-            float val = input[row * cols + i];
-            if (val > maxVal) maxVal = val;
+    // ========================================================
+    // Step 1: calculate max(x)
+    // ========================================================
+    float val = (tid < N) ? input[tid] : -1e20f;
+
+    sdata[tid] = val;
+    __syncthreads();
+
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1)
+    {
+        if (tid < stride)
+        {
+            sdata[tid] = fmaxf(sdata[tid], sdata[tid + stride]);
         }
 
-        float sum = 0.0f;
+        __syncthreads();
+    }
 
-        for (int i = 0; i < cols; i++) {
-            float e = expf(input[row * cols + i] - maxVal);
-            output[row * cols + i] = e;
-            sum += e;
+    float maxVal = sdata[0];
+
+    __syncthreads();
+
+    // ========================================================
+    // Step 2: calculate exp(x_i - max)
+    // ========================================================
+    float expVal = 0.0f;
+
+    if (tid < N)
+    {
+        expVal = expf(input[tid] - maxVal);
+        output[tid] = expVal;
+    }
+
+    sdata[tid] = expVal;
+    __syncthreads();
+
+    // ========================================================
+    // Step 3: reduction calculate sum(exp)
+    // ========================================================
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1)
+    {
+        if (tid < stride)
+        {
+            sdata[tid] += sdata[tid + stride];
         }
 
-        for (int i = 0; i < cols; i++) {
-            output[row * cols + i] /= sum;
-        }
+        __syncthreads();
+    }
+
+    float sumExp = sdata[0];
+
+    // ========================================================
+    // Step 4: normalize
+    // ========================================================
+    if (tid < N)
+    {
+        output[tid] = output[tid] / sumExp;
     }
 }
 
-int main() {
-    int rows = 4;
-    int cols = 8;
-    int size = rows * cols;
-    size_t bytes = size * sizeof(float);
+int main()
+{
+    const int N = 8;
+    size_t bytes = N * sizeof(float);
 
-    float* h_input = new float[size];
-    float* h_output = new float[size];
+    float h_input[N] =
+    {
+        1.0f, 2.0f, 3.0f, 4.0f,
+        5.0f, 6.0f, 7.0f, 8.0f
+    };
 
-    for (int i = 0; i < size; i++) {
-        h_input[i] = static_cast<float>(i % cols);
-    }
+    float h_output[N];
 
-    float *d_input, *d_output;
+    float* d_input;
+    float* d_output;
+
     cudaMalloc(&d_input, bytes);
     cudaMalloc(&d_output, bytes);
 
-    cudaMemcpy(d_input, h_input, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(
+        d_input,
+        h_input,
+        bytes,
+        cudaMemcpyHostToDevice);
 
-    softmaxKernel<<<rows, 1>>>(d_input, d_output, rows, cols);
+    int threads = 256;
+    int blocks = 1;
 
-    cudaMemcpy(h_output, d_output, bytes, cudaMemcpyDeviceToHost);
+    size_t sharedMemBytes = threads * sizeof(float);
 
-    for (int r = 0; r < rows; r++) {
-        float sum = 0.0f;
-        std::cout << "Row " << r << ": ";
-        for (int c = 0; c < cols; c++) {
-            std::cout << h_output[r * cols + c] << " ";
-            sum += h_output[r * cols + c];
-        }
-        std::cout << " | sum = " << sum << std::endl;
+    softmaxKernel<<<blocks, threads, sharedMemBytes>>>(
+        d_input,
+        d_output,
+        N);
+
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(
+        h_output,
+        d_output,
+        bytes,
+        cudaMemcpyDeviceToHost);
+
+    std::cout << "Softmax Output\n";
+
+    float sum = 0.0f;
+
+    for (int i = 0; i < N; i++)
+    {
+        sum += h_output[i];
+
+        std::cout
+            << h_input[i]
+            << " -> "
+            << h_output[i]
+            << std::endl;
     }
+
+    std::cout << "Sum = " << sum << std::endl;
 
     cudaFree(d_input);
     cudaFree(d_output);
-
-    delete[] h_input;
-    delete[] h_output;
 
     return 0;
 }

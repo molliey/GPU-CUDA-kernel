@@ -62,3 +62,43 @@ int main() {
 
     return 0;
 }
+
+/*
+
+Naive Matrix Transpose
+
+__global__ void matrixTranspose(
+    const float* input,
+    float* output,
+    int rows,
+    int cols)
+{
+    int col =
+        blockIdx.x * blockDim.x
+        + threadIdx.x;
+
+    int row =
+        blockIdx.y * blockDim.y
+        + threadIdx.y;
+
+    if(row < rows && col < cols)
+    {
+        output[col * rows + row]
+            =
+        input[row * cols + col];
+    }
+}
+
+
+Shared Memory Tile
+↓
+Bank Conflict
+↓
+Memory Coalescing
+↓
+Memory Bandwidth
+
+
+
+
+*/

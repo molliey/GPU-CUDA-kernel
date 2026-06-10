@@ -45,3 +45,15 @@ int main() {
 
     return 0;
 }
+
+
+/*
+
+ReLU:
+output[i] = max(0, input[i])
+
+Sigmoid:
+output[i] = 1 / (1 + expf(-input[i]))
+
+
+*/

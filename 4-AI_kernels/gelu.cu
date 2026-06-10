@@ -2,48 +2,98 @@
 #include <cmath>
 #include <cuda_runtime.h>
 
-__global__ void geluKernel(const float* input, float* output, int N) {
+// ============================================================
+// GELU(x) = 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715*x^3)))
+// ============================================================
+
+__global__ void geluKernel(
+    const float* input,
+    float* output,
+    int N)
+{
+    // calculate global thread index
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (idx < N) {
+    if (idx < N)
+    {
         float x = input[idx];
-        output[idx] = 0.5f * x * (1.0f + tanhf(0.79788456f * (x + 0.044715f * x * x * x)));
+
+        // sqrt(2/pi) ≈ 0.7978845608
+        float c = 0.7978845608f;
+
+        // x^3
+        float x3 = x * x * x;
+
+        // tanh argument
+        float inner = c * (x + 0.044715f * x3);
+
+        // GELU formula
+        output[idx] = 0.5f * x * (1.0f + tanhf(inner));
     }
 }
 
-int main() {
-    int N = 1024;
+int main()
+{
+    const int N = 10;
     size_t bytes = N * sizeof(float);
 
-    float* h_input = new float[N];
-    float* h_output = new float[N];
+    float h_input[N] =
+    {
+        -3.0f,
+        -2.0f,
+        -1.0f,
+         0.0f,
+         1.0f,
+         2.0f,
+         3.0f,
+         4.0f,
+         5.0f,
+         6.0f
+    };
 
-    for (int i = 0; i < N; i++) {
-        h_input[i] = (i - 512) / 100.0f;
-    }
+    float h_output[N];
 
-    float *d_input, *d_output;
+    float* d_input;
+    float* d_output;
+
     cudaMalloc(&d_input, bytes);
     cudaMalloc(&d_output, bytes);
 
-    cudaMemcpy(d_input, h_input, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(
+        d_input,
+        h_input,
+        bytes,
+        cudaMemcpyHostToDevice);
 
     int threads = 256;
     int blocks = (N + threads - 1) / threads;
 
-    geluKernel<<<blocks, threads>>>(d_input, d_output, N);
+    geluKernel<<<blocks, threads>>>(
+        d_input,
+        d_output,
+        N);
 
-    cudaMemcpy(h_output, d_output, bytes, cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
 
-    for (int i = 508; i < 518; i++) {
-        std::cout << "GELU(" << h_input[i] << ") = " << h_output[i] << std::endl;
+    cudaMemcpy(
+        h_output,
+        d_output,
+        bytes,
+        cudaMemcpyDeviceToHost);
+
+    std::cout << "GELU Output\n";
+
+    for (int i = 0; i < N; i++)
+    {
+        std::cout
+            << h_input[i]
+            << " -> "
+            << h_output[i]
+            << std::endl;
     }
 
     cudaFree(d_input);
     cudaFree(d_output);
-
-    delete[] h_input;
-    delete[] h_output;
 
     return 0;
 }

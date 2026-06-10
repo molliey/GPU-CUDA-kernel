@@ -71,3 +71,9 @@ int main() {
 
     return 0;
 }
+
+/*
+
+calculate the sum of an array using shared memory reduction
+
+*/

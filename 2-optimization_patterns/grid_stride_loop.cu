@@ -49,3 +49,19 @@ int main() {
 
     return 0;
 }
+
+/*
+
+one thread process multiple elements with a stride of blockDim.x * gridDim.x
+
+grid-stride loop
+
+for (int idx = blockIdx.x * blockDim.x + threadIdx.x;
+     idx < N;
+     idx += blockDim.x * gridDim.x)
+{
+    C[idx] = A[idx] + B[idx];
+}
+
+
+*/

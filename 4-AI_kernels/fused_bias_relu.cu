@@ -1,56 +1,88 @@
 #include <iostream>
 #include <cuda_runtime.h>
 
-__global__ void fusedBiasReLU(const float* input, const float* bias, float* output, int N, int D) {
+// =========================================================
+// Fused Bias + ReLU Kernel
+// output[i] = max(0, input[i] + bias[i % D])
+// fused kernel to reduce memory bandwidth and improve performance
+// =========================================================
+
+__global__ void fusedBiasReluKernel(
+    const float* input,
+    const float* bias,
+    float* output,
+    int N)
+{
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (idx < N * D) {
-        int col = idx % D;
-        float x = input[idx] + bias[col];
-        output[idx] = x > 0.0f ? x : 0.0f;
+    if (idx < N)
+    {
+        float x = input[idx] + bias[idx];
+
+        output[idx] = (x > 0.0f) ? x : 0.0f;
     }
 }
 
-int main() {
-    int N = 4;
-    int D = 8;
-    int size = N * D;
-    size_t bytes = size * sizeof(float);
+int main()
+{
+    const int N = 10;
+    size_t bytes = N * sizeof(float);
 
-    float* h_input = new float[size];
-    float* h_bias = new float[D];
-    float* h_output = new float[size];
+    float h_input[N] =
+    {
+        -5.0f, -2.0f, -1.0f, 0.0f, 1.0f,
+         2.0f,  3.0f,  4.0f, 5.0f, 6.0f
+    };
 
-    for (int i = 0; i < size; i++) h_input[i] = i - 10.0f;
-    for (int i = 0; i < D; i++) h_bias[i] = 1.0f;
+    float h_bias[N] =
+    {
+         1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+        -3.0f,-3.0f,-3.0f,-3.0f,-3.0f
+    };
 
-    float *d_input, *d_bias, *d_output;
+    float h_output[N];
+
+    float* d_input;
+    float* d_bias;
+    float* d_output;
+
     cudaMalloc(&d_input, bytes);
-    cudaMalloc(&d_bias, D * sizeof(float));
+    cudaMalloc(&d_bias, bytes);
     cudaMalloc(&d_output, bytes);
 
     cudaMemcpy(d_input, h_input, bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_bias, h_bias, D * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_bias, h_bias, bytes, cudaMemcpyHostToDevice);
 
     int threads = 256;
-    int blocks = (size + threads - 1) / threads;
+    int blocks = (N + threads - 1) / threads;
 
-    fusedBiasReLU<<<blocks, threads>>>(d_input, d_bias, d_output, N, D);
+    fusedBiasReluKernel<<<blocks, threads>>>(
+        d_input,
+        d_bias,
+        d_output,
+        N);
+
+    cudaDeviceSynchronize();
 
     cudaMemcpy(h_output, d_output, bytes, cudaMemcpyDeviceToHost);
 
-    for (int i = 0; i < 16; i++) {
-        std::cout << h_output[i] << " ";
+    std::cout << "Fused Bias + ReLU Output\n";
+
+    for (int i = 0; i < N; i++)
+    {
+        std::cout
+            << "max(0, "
+            << h_input[i]
+            << " + "
+            << h_bias[i]
+            << ") = "
+            << h_output[i]
+            << std::endl;
     }
-    std::cout << std::endl;
 
     cudaFree(d_input);
     cudaFree(d_bias);
     cudaFree(d_output);
-
-    delete[] h_input;
-    delete[] h_bias;
-    delete[] h_output;
 
     return 0;
 }
