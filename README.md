@@ -6,7 +6,7 @@ The goal of this repository is to build an understanding of GPU programming, mem
 
 # Repository Structure
 
-“”“text
+```text
 
 CUDA-Kernels
 │
@@ -37,7 +37,7 @@ CUDA-Kernels
     ├── fused_bias_relu.cu
     └── layernorm.cu
 
-”“”
+```
 
 <!-- 1 -->
 
